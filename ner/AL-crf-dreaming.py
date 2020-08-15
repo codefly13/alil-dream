@@ -164,6 +164,7 @@ def dreaming_phase(train_la, train_la_idx, train_pool, train_pool_idx, sent_dev,
         if len(sent_trn) > 0:
             model.train(sent_trn)
 
+        # trajectory 的长度是 budget
         # In every episode, run the trajectory
         for t in range(0, budget):
             logger.info('[Dreaming phase] Episode:' + str(tau + 1) + ' Budget:' + str(t + 1))
@@ -172,6 +173,7 @@ def dreaming_phase(train_la, train_la_idx, train_pool, train_pool_idx, sent_dev,
             # save the index of best data point or acturally the index of action
             bestindex = 0
             # Random sample k points from D_pool
+            # k样本就构成了k分类，policy预测下一个样本应该选择k样本中的哪一个
             if args.dreaming_candidate_selection_mode  == 'random':
                 logger.info(" * Random candidate selections")
                 random_pool, random_pool_idx, queryindices = utilities.randomKSamples(sent_pool, idx_pool, k)
@@ -194,11 +196,13 @@ def dreaming_phase(train_la, train_la_idx, train_pool, train_pool_idx, sent_dev,
                 logger.info(" * Unknown mode, use Random candidate selections")
                 random_pool, random_pool_idx, queryindices = utilities.randomKSamples(sent_pool, idx_pool, k)
 
+            # pred_sents是抽样的k样本再组合上专家预测的标签
             logger.debug(' * Generate label using expert')
             x_tokens = [' '.join(expert.sent2tokens(s)) for s in random_pool]
             y_labels = expert.predict(random_pool)
             pred_sents = utilities.data2sents(x_tokens, y_labels)
 
+            # k个样本中，选出那个加入到训练集后能让模型f1 score增加最快的样本
             for datapoint in zip(pred_sents, random_pool_idx):
                 seq = datapoint[0]
                 idx = datapoint[1]
@@ -207,6 +211,7 @@ def dreaming_phase(train_la, train_la_idx, train_pool, train_pool_idx, sent_dev,
 
                 if os.path.exists(tagger_temp):
                     os.remove(tagger_temp)
+                # 加载NER模型
                 model_temp = CRFTagger(tagger_temp, num_classes=num_classes)
                 model_temp.train(train_la_temp)
                 f1_temp = model_temp.test(dev_sents, label2str)
@@ -220,6 +225,8 @@ def dreaming_phase(train_la, train_la_idx, train_pool, train_pool_idx, sent_dev,
 
             # get the state and action
             state = utilities.getAllState(idx_trn, random_pool, random_pool_idx, model, w2v, max_len, num_classes)
+            
+            # 将抽样出来的数据（专家或者预测的）加入到策略训练数据中
             # action=bestindex
             coin = np.random.rand(1)
             if (coin > 0.5):
@@ -229,8 +236,9 @@ def dreaming_phase(train_la, train_la_idx, train_pool, train_pool_idx, sent_dev,
                 action=agent.predict(args.k, state)
             states.append(state)
             actions.append(action)
-            # update the model
 
+            # 选中的样本加入训练集
+            # update the model
             theindex = queryindices[bestindex]
             sent_trn.append(sent_pool[theindex])
             idx_trn.append(idx_pool[theindex])
@@ -246,6 +254,7 @@ def dreaming_phase(train_la, train_la_idx, train_pool, train_pool_idx, sent_dev,
         del idx_pool
         del sent_trn
         del idx_trn
+        # gc什么意思
         gc.collect()
     return agent
 
@@ -301,13 +310,16 @@ for r in range(0, args.timesteps):
         logger.info(" Initial F1 : {}".format(str(f1_score)))
     episode = args.ndream
     while step < BUDGET:
+        # 训练NER模型
         tagger, step, f1_list, train_la, train_la_idx, train_pool, train_pool_idx = learning_phase(train_la, train_la_idx, train_pool
                                                                                            , train_pool_idx, test_sents,
                                                    tagger, agent, args.learning_phase_length,
                                                    step, f1_list)
+        # 训练抽样策略
         episode = args.ndream + int(step / args.dream_increase_step)
         agent = dreaming_phase(train_la, train_la_idx, train_pool, train_pool_idx, dev_sents, args.dreaming_budget,
                                 episode, agent, tagger)
+
         logger.info("Save policy to {}".format(policy_output))
         agent.save_model()
 

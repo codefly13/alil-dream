@@ -90,15 +90,25 @@ def getAState(x_trn, y_trn, x_neglist, model):
     
 
 def getbottleFeature(model,X):
+    # from keras.models import Model
     Inp = model.input
     Outp = model.get_layer('Hidden').output
+    # 第一个参数是输入，第二个参数是输出，不管是输出还是输入，可以是model也可以是层
     curr_layer_model = Model(Inp, Outp)
     bottle_feature = curr_layer_model.predict(X)
     return bottle_feature
 
 
-#get the output of intermediate layer
+#get the output of intermediate layer。intermediate 表示中间的
 def get_intermediatelayer(model, layer, X_batch):
+    # from keras import backend as K
+    # keras.backend.learning_phase, the value "1" (training mode) or "0" (test mode) to feed_dict。
+    # 类似于模型可以接收一个参数。
+    # layer=model.get_layer(index=index)
+    # layer=model.layers[index]  # 这样获取每一个层也是一样的
     get_activations = K.function([model.layers[0].input, K.learning_phase()], [model.layers[layer].output,])
+    # 0 => K.learning_phase()意思是模型是测试模式的。
     activations = get_activations([X_batch,0])
     return activations    
+
+

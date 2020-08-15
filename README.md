@@ -1,3 +1,8 @@
+这份代码是fork自源代码的，阅读过程加了中文解释。
+
+# 源代码
+https://github.com/trangvu/alil-dream
+
 # Dream-ALIL
 Source code of paper "Learning How to Active Learn by Dreaming" - ACL2019 
 

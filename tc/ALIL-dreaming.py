@@ -70,11 +70,13 @@ def learning_phase(x_trn, y_trn, x_pool, y_pool, x_val, y_val, x_test, y_test, m
                                                                                             args.k_learning)
         # Use the policy to get best sample
         state = getAState(x_trn, y_trn, x_rand_unl, model)
+        # 一维度变二维
         tempstates = np.expand_dims(state, axis=0)
+        # 预测出选择集合中的哪一个样本
         action = policy.predict_classes(tempstates, verbose=0)[0]
         x_new = x_rand_unl[action]
         y_new = y_rand_unl[action]
-
+        # 把选出来的样本加入大到训练数据中
         x_trn = np.vstack([x_trn, x_new])
         y_trn = np.vstack([y_trn, y_new])
         model.fit(x_trn, y_trn, validation_data=(x_val, y_val),

@@ -53,8 +53,15 @@ def getClassifier(num_words, EMBEDDING_DIM, embedding_matrix, MAX_SEQUENCE_LENGT
 
 def getPolicy(k, state_dim):
     policy = Sequential()
+    # 将层应用到每一个时间片上，像panda的map函数
+    # 如(sample, time, width, length, channel)这个5维向量，那么会把层应用到每一个time上。
+    # 每一个时间步的(sample, width, length, channel)会被应用层函数
+    # 在这个式子中，输入是(batch_size,k, state_dim), 经过这一层变成(batch_size,k, 1)
     policy.add(TimeDistributed(Dense(1), input_shape=(k, state_dim)))
+    # 在这个式子中，输入是(batch_size,k, 1), 经过这一层变成(batch_size,k)
     policy.add(Reshape((k,), input_shape=(k,1)))
+    # 在这个式子中，输入是(batch_size,k), 经过这一层依然是(batch_size,k)。batch_size的每个k维度向量经过softmax得到
+    # k个类的概率分布。
     policy.add(Activation('softmax'))
     optimizer = optimizers.Adam(lr=1e-4)
     policy.compile(loss='categorical_crossentropy',
@@ -92,6 +99,7 @@ def getAState(x_trn, y_trn, x_neglist, model):
 def getbottleFeature(model,X):
     # from keras.models import Model
     Inp = model.input
+    # input经过名为Hidden的层的前面的层到Hidden层后的输出
     Outp = model.get_layer('Hidden').output
     # 第一个参数是输入，第二个参数是输出，不管是输出还是输入，可以是model也可以是层
     curr_layer_model = Model(Inp, Outp)

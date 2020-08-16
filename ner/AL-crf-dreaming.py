@@ -73,11 +73,13 @@ else:
     selected_modules=None
     num_classes = 5
 
+# 已经tokens化了一个单词对应一个label
 train_sents = utilities.data2sents(train_x, train_y)
 test_sents = utilities.data2sents(test_x, test_y)
 dev_sents = utilities.data2sents(dev_x, dev_y)
 logger.info("Training size: {}".format(len(train_sents)))
 
+# 将tokens变成id
 # build vocabulary
 logger.info("Max document length:".format(max_len))
 vocab_processor = tf.contrib.learn.preprocessing.VocabularyProcessor(
@@ -89,6 +91,7 @@ vocab = vocab_processor.vocabulary_
 vocab.freeze()
 test_idx = list(vocab_processor.fit_transform(test_x))
 
+# 加载embedding
 # build embeddings
 vocab = vocab_processor.vocabulary_
 vocab_size = VOCABULARY

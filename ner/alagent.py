@@ -29,30 +29,34 @@ class ALAgent:
         self.saver = tf.train.Saver()
 
     def build_model(self):
+        # 这里他把抽取特征的各个模块与策略模型的训练结合一起，一起更新
+
         self.k = tf.placeholder(
             tf.int32, shape=(), name="k")
+        
+        # 计算文本样本的表示特征
         self.sequence_input = tf.placeholder(
             tf.int32, [None, self.seq_len], name="sequence_input")
         self.sent_content, sent_state_dim = self.process_sentence(self.sequence_input)
-
+        # 计算边缘概率特征
         self.pred_input = tf.placeholder(
             tf.float32, [None, self.seq_len, self.num_classes], name="marginal_prob")
         self.state_marginals, marginal_dim = self.process_prediction(self.pred_input)
-
+        # 计算熵特征
         self.entropy_input = tf.placeholder(
             tf.float32, [None, self.seq_len], name="entropy_seq")
         self.state_entropy, entropy_dim = self.process_entropies(self.entropy_input)
-
+        # 输入样本的置信度
         self.confidence_input = tf.placeholder(
             tf.float32, [None, 1], name="input_confidence")
-
+        # 输入样本的熵状态
         self.entropy_stat = tf.placeholder(
             tf.float32, [None, 3], name="entropy_stat")
-
+        # 带标签样本的表示
         self.labeled_data_rep_input = tf.placeholder(
             tf.float32, [None, self.embedding_size], name="label_data_rep")
         labeled_data_rep = tf.layers.dense(inputs=self.labeled_data_rep_input, units=128, activation=tf.nn.relu, name="labeled_pool")
-
+        # 拼接上述特征
         inputs = tf.concat([labeled_data_rep, self.sent_content, self.state_marginals,
                             self.confidence_input, self.state_entropy, self.entropy_stat], axis=1)
         self.h_fc1_all = tf.layers.dense(inputs, 256, activation=tf.nn.relu, name="policy_net_dense")
@@ -62,16 +66,18 @@ class ALAgent:
 
         self.logits = tf.reshape(self.score,[-1,self.k])
         self.action_labels = tf.placeholder(tf.int32, [None, None])
-
+        # 计算标签预测值与真实值的交叉熵
         self.loss = tf.nn.softmax_cross_entropy_with_logits(logits=self.logits, labels=self.action_labels)
         self.cost = tf.reduce_mean(self.loss)
         self.train_step = tf.train.AdamOptimizer(1e-6).minimize(self.cost)
+        # 如果预测的话，用下面的代码
         # self.probabilities = tf.nn.softmax(self.logits)
         # self.predictions = tf.argmax(tf.nn.softmax(self.probabilities), 1)
         self.sess = tf.Session()
         self.sess.run(tf.global_variables_initializer())
 
     def process_sentence(self, sequence_input):
+        # 用CNN得到句子的embedding
         with tf.name_scope("sentence_cnn"):
             with tf.device('/cpu:0'):
                 self.embedding_layer = tf.Variable(tf.random_uniform(
@@ -117,6 +123,7 @@ class ALAgent:
         return self.sent_content, num_filters_total
 
     def process_prediction(self, predictions):
+        # 用CNN计算出预测标签的embedding
         with tf.name_scope("marginal_prob_cnn"):
             filter_sizes = [3]
             num_filters = 20
@@ -162,6 +169,7 @@ class ALAgent:
         return self.state_marginals, num_filters_total
 
     def process_entropies(self, entropies):
+        # 用CNN计算样本的信息熵
         with tf.name_scope("entropy_cnn"):
             filter_sizes = [2, 3, 4]
             num_filters = 20
